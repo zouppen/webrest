@@ -1,6 +1,10 @@
 module Git where
 
-import Text.Parsec
+import System.IO
+import System.Exit
+import Text.ParserCombinators.Parsec
+import Control.Monad (liftM)
+import System.Process
 import Helpers
 
 type GitMode = String
@@ -28,19 +32,23 @@ toStatus = lookupM [('M',InPlaceEdit)
                    ,('U',Unmerged)
                    ] "Unrecognized git status letter."
 
--- |Used to get Nothing if parsing empty string.
-safeRead [] = Nothing
-safeRead x = Just $ read x
+-- |Parser for maybe parsing any positive 10-base number.
+maybeNumber :: (Num a, Read a) => GenParser Char () (Maybe a)
+maybeNumber = (liftM (Just . read) $ many1 digit) <|> return Nothing
+
+nul = char '\NUL'
+
+gitPath = "git"
 
 -- |Parses diff tree.
-diffTree :: Parsec String () [DiffInfo]
-diffTree = do
+diffTreeParser :: GenParser Char () [DiffInfo]
+diffTreeParser = do
   list <- many diffTreeLine
   eof
   return list
 
 -- |Parses a single diff tree line.
-diffTreeLine :: Parsec String () DiffInfo
+diffTreeLine :: GenParser Char () DiffInfo
 diffTreeLine = do
   char ':'
   modeSrc <- count 6 digit
@@ -52,15 +60,39 @@ diffTreeLine = do
   hashDst <- count 40 hexDigit
   space
   status <- upper >>= toStatus
-  score <- parsecMap safeRead $ many digit
-  many1 space
-  file <- manyTill anyChar newline
+  score <- maybeNumber
+  nul
+  file <- manyTill anyChar nul
 
   return $ DiffInfo modeSrc modeDst hashSrc hashDst status score file
 
--- runInteractiveProcess
---   :: FilePath		-- ^ Filename of the executable
---   -> [String]		-- ^ Arguments to pass to the executable
---   -> Maybe FilePath		-- ^ Optional path to the working directory
---   -> Maybe [(String,String)]	-- ^ Optional environment (otherwise inherit)
---   -> IO (Handle,Handle,Handle,ProcessHandle)
+parseGitTest :: String -> IO (Either ParseError [DiffInfo])
+parseGitTest = parseFromFile diffTreeParser
+
+
+-- |Runs git comand on given repository with given arguments. Returns
+-- Left in case of an error and Right in case off success. This
+-- function is used as a plumbing for higher level functions.
+runGit :: Maybe String -> [String] -> IO (Either String String)
+runGit repo args = do
+  process <- createProcess cp
+  contents <- hGetContents $ outH process
+  errors <- hGetContents $ errH process
+  ret <- waitForProcess $ processH process
+  return $ case ret of
+    ExitSuccess   -> Right contents
+    ExitFailure _ -> Left errors
+  
+  where cp = CreateProcess {
+                     cmdspec = RawCommand gitPath args
+                   , cwd     = repo
+                   , env     = Nothing
+                   , std_in  = Inherit
+                   , std_out = CreatePipe
+                   , std_err = CreatePipe
+                   , close_fds = False
+             }
+        processH (_,_,_,x) = x
+        outH (_,Just x,_,_) = x
+        errH (_,_,Just x,_) = x
+
