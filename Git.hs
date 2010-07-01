@@ -2,7 +2,9 @@ module Git where
 
 import System.IO
 import System.Exit
-import Text.ParserCombinators.Parsec
+import Text.Parsec
+import Text.Parsec.ByteString
+import qualified Data.ByteString as B
 import Control.Monad (liftM)
 import System.Process
 import Helpers
@@ -69,19 +71,26 @@ diffTreeLine = do
 parseGitTest :: String -> IO (Either ParseError [DiffInfo])
 parseGitTest = parseFromFile diffTreeParser
 
+-- |Compares the content and mode of blobs found via two tree
+-- |objects. Uses git-diff-tree.
+diffTree :: Maybe FilePath -> String -> String ->
+            IO (Either ParseError [DiffInfo])
+diffTree repo oldRev newRev = do
+  gitOut <- runGit repo ["diff-tree","-r","-z",oldRev,newRev]
+  liftM (parse diffTreeParser "(git)") gitOut
 
 -- |Runs git comand on given repository with given arguments. Returns
 -- Left in case of an error and Right in case off success. This
 -- function is used as a plumbing for higher level functions.
-runGit :: Maybe String -> [String] -> IO (Either String String)
+runGit :: (Monad m) => Maybe String -> [String] -> IO (m B.ByteString)
 runGit repo args = do
   process <- createProcess cp
-  contents <- hGetContents $ outH process
+  contents <- B.hGetContents $ outH process
   errors <- hGetContents $ errH process
   ret <- waitForProcess $ processH process
   return $ case ret of
-    ExitSuccess   -> Right contents
-    ExitFailure _ -> Left errors
+    ExitSuccess   -> return contents
+    ExitFailure _ -> fail errors
   
   where cp = CreateProcess {
                      cmdspec = RawCommand gitPath args
