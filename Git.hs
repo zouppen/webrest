@@ -8,7 +8,7 @@ import GitInternal
 -- |objects. Uses git-diff-tree.
 diffTree :: Maybe FilePath -> String -> String -> IO [DiffInfo]
 diffTree repo oldRev newRev = do
-  gitOut <- runGit repo ["diff-tree","-r","-z",oldRev,newRev]
+  gitOut <- runGit repo ["diff-tree","-M","-C","-r","-z",oldRev,newRev]
   case parse diffTreeParser "(git)" gitOut of
     Left e -> fail $ show e
     Right a -> return a

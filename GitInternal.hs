@@ -25,6 +25,13 @@ maybeNumber = (liftM (Just . read) $ many1 digit) <|> return Nothing
 
 nul = char '\NUL'
 
+-- |Useful in situation where it is known beforehand that one
+-- shouldn't parse if the condition is False. In that case no input
+-- is consumed and Nothing is returned immediately.
+maybeDo :: (Monad m) => m a -> Bool -> m (Maybe a)
+maybeDo _ False = return Nothing
+maybeDo p True = liftM Just $ p
+
 gitPath = "git"
 
 -- |Parses diff tree.
@@ -49,9 +56,15 @@ diffTreeLine = do
   status <- upper >>= toStatus
   score <- maybeNumber
   nul
-  file <- manyTill anyChar nul
+  fileSrc <- manyTill anyChar nul
 
-  return $ DiffInfo modeSrc modeDst hashSrc hashDst status score file
+  -- Git binary output is not perfectly defined. Why there are no two
+  -- successive NULs if there is not dstFile?  Now we need /if/ which
+  -- is ugly.
+  fileDst <- maybeDo (manyTill anyChar nul)
+               $ status `elem` [CopyEdit,RenameEdit]
+
+  return $ DiffInfo modeSrc modeDst hashSrc hashDst status score fileSrc fileDst
 
 -- |Runs git comand on given repository with given arguments. Returns
 -- Left in case of an error and Right in case off success. This

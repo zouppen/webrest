@@ -11,7 +11,8 @@ data DiffInfo = DiffInfo {
     , hashDst :: GitHash
     , status  :: Status
     , score   :: Maybe Integer
-    , file    :: GitFile
+    , srcFile :: GitFile
+    , dstFile :: Maybe GitFile
     } deriving (Show)
 
 data Status = InPlaceEdit | CopyEdit | RenameEdit | Create | Delete | Unmerged
