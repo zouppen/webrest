@@ -73,22 +73,23 @@ parseGitTest = parseFromFile diffTreeParser
 
 -- |Compares the content and mode of blobs found via two tree
 -- |objects. Uses git-diff-tree.
-diffTree :: Maybe FilePath -> String -> String ->
-            IO (Either ParseError [DiffInfo])
+diffTree :: Maybe FilePath -> String -> String -> IO [DiffInfo]
 diffTree repo oldRev newRev = do
   gitOut <- runGit repo ["diff-tree","-r","-z",oldRev,newRev]
-  liftM (parse diffTreeParser "(git)") gitOut
+  case parse diffTreeParser "(git)" gitOut of
+    Left e -> fail $ show e
+    Right a -> return a
 
 -- |Runs git comand on given repository with given arguments. Returns
 -- Left in case of an error and Right in case off success. This
 -- function is used as a plumbing for higher level functions.
-runGit :: (Monad m) => Maybe String -> [String] -> IO (m B.ByteString)
+runGit :: Maybe String -> [String] -> IO B.ByteString
 runGit repo args = do
   process <- createProcess cp
   contents <- B.hGetContents $ outH process
   errors <- hGetContents $ errH process
   ret <- waitForProcess $ processH process
-  return $ case ret of
+  case ret of
     ExitSuccess   -> return contents
     ExitFailure _ -> fail errors
   
