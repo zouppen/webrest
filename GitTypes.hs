@@ -17,3 +17,15 @@ data DiffInfo = DiffInfo {
 
 data Status = InPlaceEdit | CopyEdit | RenameEdit | Create | Delete | Unmerged
               deriving (Show,Eq)
+
+data EditDetection = InPlace | Rename | Copy  deriving (Show)
+
+data Options = Options {
+      editDetection :: EditDetection
+    , recurse       :: Bool
+    } deriving (Show)
+
+defaultOptions = Options {
+                   editDetection = InPlace
+                 , recurse = True
+                 }

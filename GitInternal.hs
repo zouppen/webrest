@@ -6,6 +6,7 @@ import Text.Parsec
 import Text.Parsec.ByteString
 import qualified Data.ByteString as B
 import Control.Monad (liftM)
+import Data.Maybe (catMaybes)
 import System.Process
 import Helpers
 import GitTypes
@@ -91,3 +92,25 @@ runGit repo args = do
         processH (_,_,_,x) = x
         outH (_,Just x,_,_) = x
         errH (_,_,Just x,_) = x
+
+runAndParseGit :: GenParser Char () a  -- ^ Parser for results.
+               -> Maybe String         -- ^ Path to repository.
+               -> [Maybe String]       -- ^ Parameters for git.
+               -> IO a                 -- ^ Returns parser output.
+runAndParseGit parser wd params = do
+  gitOut <- runGit wd (catMaybes params)
+  case parse parser "(git)" gitOut of
+    Left e -> fail $ show e
+    Right a -> return a
+
+
+gitOptRecurse :: Options -> Maybe String
+gitOptRecurse o = case recurse o of
+                      True -> Just "-r"
+                      False -> Nothing
+
+gitOptEdit :: Options -> Maybe String
+gitOptEdit o = case editDetection o of
+                   InPlace -> Nothing
+                   Rename  -> Just "-R"
+                   Copy    -> Just "-C"
