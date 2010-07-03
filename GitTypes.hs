@@ -20,12 +20,24 @@ data Status = InPlaceEdit | CopyEdit | RenameEdit | Create | Delete | Unmerged
 
 data EditDetection = InPlace | Rename | Copy  deriving (Show)
 
+data Type = Tree | Blob  deriving (Show)
+
+data LsInfo = LsInfo {
+      mode     :: GitMode
+    , fileType :: Type
+    , hash     :: GitHash
+    , fileSize :: Maybe Integer
+    , fileName :: GitFile
+    }
+
 data Options = Options {
-      editDetection :: EditDetection
-    , recurse       :: Bool
+      editDetection :: EditDetection -- ^ Detection of non-in-place edits.
+    , recurse       :: Bool          -- ^ Recurse into subdirectories.
+    , showSizes     :: Bool          -- ^ Show file sizes where available.
     } deriving (Show)
 
 defaultOptions = Options {
                    editDetection = InPlace
                  , recurse = True
+                 , showSizes = False
                  }

@@ -11,12 +11,27 @@ diffTree :: Options        -- ^ Options.
          -> String         -- ^ Source tree-ish (revision number etc.).
          -> String         -- ^ Destination tree-ish.
          -> Maybe FilePath -- ^ Git filesystem path to diff.
-         -> IO [DiffInfo]  -- ^ Returns differece list
+         -> IO [DiffInfo]  -- ^ Returns difference list
 diffTree o repo oldRev newRev path = do
-  runAndParseGit diffTreeParser repo params
+  runAndParseGit (gitLines diffTreeLine) repo params
     where params = [ Just "diff-tree",Just "-z"
                    , gitOptEdit o, gitOptRecurse o
                    , Just oldRev, Just newRev
+                   , path
+                   ]
+
+-- |Lists the files contained in a given tree. Lists the file sizes
+-- too, if that option is present. Uses git ls-tree internally.
+lsTree :: Options        -- ^ Options.
+       -> Maybe FilePath -- ^ Path to repository or Nothing if current dir.
+       -> String         -- ^ Tree-ish (revision number etc.).
+       -> Maybe FilePath -- ^ Git filesystem path to diff.
+       -> IO [LsInfo]    -- ^ Returns file listing
+lsTree o repo rev path = do
+  runAndParseGit (gitLines (lsTreeLine (showSizes o))) repo params
+    where params = [ Just "ls-tree",Just "-z"
+                   , gitOptSize o, gitOptRecurse o
+                   , Just rev
                    , path
                    ]
 

@@ -20,11 +20,23 @@ toStatus = lookupM [('M',InPlaceEdit)
                    ,('U',Unmerged)
                    ] "Unrecognized git status letter."
 
--- |Parser for maybe parsing any positive 10-base number.
+toType = lookupM [("blob",Blob)
+                 ,("tree",Tree)
+                 ] "Unrecognized git file type."
+
+-- |Parser for maybe parsing any positive 10-base number. That means
+-- if parsing can't be done, no input is consumed and Nothing is
+-- returned.
 maybeNumber :: (Num a, Read a) => GenParser Char () (Maybe a)
 maybeNumber = (liftM (Just . read) $ many1 digit) <|> return Nothing
 
 nul = char '\NUL'
+
+-- |Reads file size in git format-
+size :: (Num a, Read a) => GenParser Char () a
+size = do
+  spaces
+  liftM read $ many digit
 
 -- |Useful in situation where it is known beforehand that one
 -- shouldn't parse if the condition is False. In that case no input
@@ -35,14 +47,14 @@ maybeDo p True = liftM Just $ p
 
 gitPath = "git"
 
--- |Parses diff tree.
-diffTreeParser :: GenParser Char () [DiffInfo]
-diffTreeParser = do
-  list <- many diffTreeLine
+-- |Parses git listings.
+gitLines :: GenParser Char () a -> GenParser Char () [a]
+gitLines line = do
+  list <- many line
   eof
   return list
 
--- |Parses a single diff tree line.
+-- |Parses a single line of git diff-tree.
 diffTreeLine :: GenParser Char () DiffInfo
 diffTreeLine = do
   char ':'
@@ -66,6 +78,19 @@ diffTreeLine = do
                $ status `elem` [CopyEdit,RenameEdit]
 
   return $ DiffInfo modeSrc modeDst hashSrc hashDst status score fileSrc fileDst
+  
+-- | Reads single line of git ls-tree
+lsTreeLine :: Bool                     -- ^ Is file size included?
+           -> GenParser Char () LsInfo -- ^ Returns: Parser
+lsTreeLine hasSize = do
+  mode <- count 6 digit
+  fileType <- manyTill lower space >>= toType
+  hash <- count 40 hexDigit
+  fileSize <- maybeDo size hasSize
+  tab
+  fileName <- manyTill anyChar nul
+  
+  return $ LsInfo mode fileType hash fileSize fileName
 
 -- |Runs git comand on given repository with given arguments. Returns
 -- Left in case of an error and Right in case off success. This
@@ -114,3 +139,8 @@ gitOptEdit o = case editDetection o of
                    InPlace -> Nothing
                    Rename  -> Just "-R"
                    Copy    -> Just "-C"
+
+gitOptSize :: Options -> Maybe String
+gitOptSize o = case showSizes o of
+               True -> Just "-l"
+               False -> Nothing
