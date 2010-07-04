@@ -2,12 +2,12 @@ module GitInternal where
 
 import System.IO
 import System.Exit
+import System.Process
 import Text.Parsec
 import Text.Parsec.ByteString
 import qualified Data.ByteString as B
 import Control.Monad (liftM)
 import Data.Maybe (catMaybes)
-import System.Process
 import Helpers
 import GitTypes
 
@@ -50,11 +50,11 @@ noSize = do
   return Nothing
 
 -- |Useful in situation where it is known beforehand that one
--- shouldn't parse if the condition is False. In that case no input
--- is consumed and Nothing is returned immediately.
-failUnless :: (Monad m) => Bool -> m ()
-failUnless False = fail "todo msg"
-failUnless True = return ()
+-- shouldn't parse if the condition is False. In both cases no input
+-- is consumed.
+nothingOrFail :: (Monad m) => Bool -> m (Maybe a)
+nothingOrFail False = return Nothing
+nothingOrFail True = fail "Design error."
 
 gitPath = "git"
 
@@ -86,10 +86,8 @@ diffTreeLine = do
   -- Git binary output is not perfectly defined. Why there are no two
   -- successive NULs if there is not dstFile?  Now we need conditional
   -- processing which is ugly.
-  fileDst <- do 
-    failUnless (status `elem` [CopyEdit,RenameEdit])
-    a <- manyTill anyChar nul
-    return $ Just a
+  fileDst <- nothingOrFail (status `elem` [CopyEdit,RenameEdit]) <|>
+             liftM Just (manyTill anyChar nul)
 
   return $ DiffInfo modeSrc modeDst hashSrc hashDst status score fileSrc fileDst
   
@@ -101,7 +99,7 @@ lsTreeLine hasSize = do
   space
   fileType <- manyTill lower space >>= toType
   hash <- count 40 hexDigit
-  fileSize <- failUnless hasSize >> size
+  fileSize <- nothingOrFail hasSize <|> size 
   tab
   fileName <- manyTill anyChar nul
   
