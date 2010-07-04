@@ -27,28 +27,40 @@ toType = lookupM [("blob",Blob)
 -- |Parser for maybe parsing any positive 10-base number. That means
 -- if parsing can't be done, no input is consumed and Nothing is
 -- returned.
-maybeNumber :: (Num a, Read a) => GenParser Char () (Maybe a)
-maybeNumber = (liftM (Just . read) $ many1 digit) <|> return Nothing
+maybeIntegral :: (Read a, Integral a) => GenParser Char () (Maybe a)
+maybeIntegral = liftM Just integral <|> return Nothing
+
+-- |Ordinary integral number
+integral :: (Read a, Integral a) => GenParser Char () a
+integral = do
+  a <- many1 digit
+  return $ read a
 
 nul = char '\NUL'
 
--- |Reads file size in git format-
-size :: (Num a, Read a) => GenParser Char () a
+-- |Reads file size in git format.
+size :: (Read a, Integral a) => GenParser Char () (Maybe a)
 size = do
   spaces
-  liftM read $ many digit
+  liftM Just integral <|> noSize
+
+-- |Tries to read "no size", that appears in the size displayed for trees.
+noSize = do
+  char '-'
+  return Nothing
 
 -- |Useful in situation where it is known beforehand that one
 -- shouldn't parse if the condition is False. In that case no input
 -- is consumed and Nothing is returned immediately.
-maybeDo :: (Monad m) => m a -> Bool -> m (Maybe a)
-maybeDo _ False = return Nothing
-maybeDo p True = liftM Just $ p
+failUnless :: (Monad m) => Bool -> m ()
+failUnless False = fail "todo msg"
+failUnless True = return ()
 
 gitPath = "git"
 
 -- |Parses git listings.
-gitLines :: GenParser Char () a -> GenParser Char () [a]
+gitLines :: GenParser Char () a   -- ^ A parser for reading a git record.
+         -> GenParser Char () [a] -- ^ Returns: A parser for whole output.
 gitLines line = do
   list <- many line
   eof
@@ -67,15 +79,17 @@ diffTreeLine = do
   hashDst <- count 40 hexDigit
   space
   status <- upper >>= toStatus
-  score <- maybeNumber
+  score <- maybeIntegral
   nul
   fileSrc <- manyTill anyChar nul
 
   -- Git binary output is not perfectly defined. Why there are no two
-  -- successive NULs if there is not dstFile?  Now we need /if/ which
-  -- is ugly.
-  fileDst <- maybeDo (manyTill anyChar nul)
-               $ status `elem` [CopyEdit,RenameEdit]
+  -- successive NULs if there is not dstFile?  Now we conditional
+  -- processing which is ugly.
+  fileDst <- do 
+    failUnless (status `elem` [CopyEdit,RenameEdit])
+    a <- manyTill anyChar nul
+    return $ Just a
 
   return $ DiffInfo modeSrc modeDst hashSrc hashDst status score fileSrc fileDst
   
@@ -84,9 +98,10 @@ lsTreeLine :: Bool                     -- ^ Is file size included?
            -> GenParser Char () LsInfo -- ^ Returns: Parser
 lsTreeLine hasSize = do
   mode <- count 6 digit
+  space
   fileType <- manyTill lower space >>= toType
   hash <- count 40 hexDigit
-  fileSize <- maybeDo size hasSize
+  fileSize <- failUnless hasSize >> size
   tab
   fileName <- manyTill anyChar nul
   
@@ -118,6 +133,7 @@ runGit repo args = do
         outH (_,Just x,_,_) = x
         errH (_,_,Just x,_) = x
 
+-- |Runs git and parses its output.
 runAndParseGit :: GenParser Char () a  -- ^ Parser for results.
                -> Maybe String         -- ^ Path to repository.
                -> [Maybe String]       -- ^ Parameters for git.

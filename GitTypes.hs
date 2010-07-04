@@ -28,7 +28,7 @@ data LsInfo = LsInfo {
     , hash     :: GitHash
     , fileSize :: Maybe Integer
     , fileName :: GitFile
-    }
+    } deriving (Show)
 
 data Options = Options {
       editDetection :: EditDetection -- ^ Detection of non-in-place edits.
