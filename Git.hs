@@ -25,7 +25,7 @@ diffTree o repo oldRev newRev path = do
 lsTree :: Options        -- ^ Options.
        -> Maybe FilePath -- ^ Path to repository or Nothing if current dir.
        -> String         -- ^ Tree-ish (revision number etc.).
-       -> Maybe FilePath -- ^ Git filesystem path to diff.
+       -> Maybe FilePath -- ^ Git filesystem path to list.
        -> IO [LsInfo]    -- ^ Returns file listing
 lsTree o repo rev path = do
   runAndParseGit (gitLines (lsTreeLine (showSizes o))) repo params
@@ -35,3 +35,11 @@ lsTree o repo rev path = do
                    , path
                    ]
 
+catFile :: Options        -- ^ Options.
+        -> Maybe FilePath -- ^ Path to repository or Nothing if current dir.
+        -> String         -- ^ Tree-ish (revision number etc.).
+        -> Maybe FilePath -- ^ Git filesystem object to cat.
+        -> IO [LsInfo]    -- ^ Returns: File contents.
+catFile o repo rev path = do
+  
+-- runGit :: Maybe String -> [Maybe String] -> IO B.ByteString

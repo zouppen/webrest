@@ -110,7 +110,7 @@ lsTreeLine hasSize = do
 -- |Runs git comand on given repository with given arguments. Returns
 -- Left in case of an error and Right in case off success. This
 -- function is used as a plumbing for higher level functions.
-runGit :: Maybe String -> [String] -> IO B.ByteString
+runGit :: Maybe String -> [Maybe String] -> IO B.ByteString
 runGit repo args = do
   process <- createProcess cp
   contents <- B.hGetContents $ outH process
@@ -121,7 +121,7 @@ runGit repo args = do
     ExitFailure _ -> fail errors
   
   where cp = CreateProcess {
-                     cmdspec = RawCommand gitPath args
+                     cmdspec = RawCommand gitPath $ catMaybes args
                    , cwd     = repo
                    , env     = Nothing
                    , std_in  = Inherit
@@ -139,7 +139,7 @@ runAndParseGit :: GenParser Char () a  -- ^ Parser for results.
                -> [Maybe String]       -- ^ Parameters for git.
                -> IO a                 -- ^ Returns parser output.
 runAndParseGit parser wd params = do
-  gitOut <- runGit wd (catMaybes params)
+  gitOut <- runGit wd params
   case parse parser "(git)" gitOut of
     Left e -> fail $ show e
     Right a -> return a
