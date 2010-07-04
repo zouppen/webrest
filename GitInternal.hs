@@ -30,7 +30,7 @@ toType = lookupM [("blob",Blob)
 maybeIntegral :: (Read a, Integral a) => GenParser Char () (Maybe a)
 maybeIntegral = liftM Just integral <|> return Nothing
 
--- |Ordinary integral number
+-- |Ordinary integral number.
 integral :: (Read a, Integral a) => GenParser Char () a
 integral = do
   a <- many1 digit
@@ -84,7 +84,7 @@ diffTreeLine = do
   fileSrc <- manyTill anyChar nul
 
   -- Git binary output is not perfectly defined. Why there are no two
-  -- successive NULs if there is not dstFile?  Now we conditional
+  -- successive NULs if there is not dstFile?  Now we need conditional
   -- processing which is ugly.
   fileDst <- do 
     failUnless (status `elem` [CopyEdit,RenameEdit])
@@ -93,7 +93,7 @@ diffTreeLine = do
 
   return $ DiffInfo modeSrc modeDst hashSrc hashDst status score fileSrc fileDst
   
--- | Reads single line of git ls-tree
+-- |Reads a single line of git ls-tree.
 lsTreeLine :: Bool                     -- ^ Is file size included?
            -> GenParser Char () LsInfo -- ^ Returns: Parser
 lsTreeLine hasSize = do
@@ -107,10 +107,12 @@ lsTreeLine hasSize = do
   
   return $ LsInfo mode fileType hash fileSize fileName
 
--- |Runs git comand on given repository with given arguments. Returns
--- Left in case of an error and Right in case off success. This
--- function is used as a plumbing for higher level functions.
-runGit :: Maybe String -> [Maybe String] -> IO B.ByteString
+-- |Runs git command on given repository with given arguments. Fails in
+-- case of an error. This function is used as a plumbing for higher
+-- level functions.
+runGit :: Maybe String    -- ^ Path to repository, Nothing if current dir.
+       -> [Maybe String]  -- ^ List of Just parameters.
+       -> IO B.ByteString -- ^ Returns: Git output.
 runGit repo args = do
   process <- createProcess cp
   contents <- B.hGetContents $ outH process
@@ -144,6 +146,7 @@ runAndParseGit parser wd params = do
     Left e -> fail $ show e
     Right a -> return a
 
+-- Now comes some option generators.
 
 gitOptRecurse :: Options -> Maybe String
 gitOptRecurse o = case recurse o of
